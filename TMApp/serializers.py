@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User, Task
+from .models import *
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -34,8 +34,8 @@ class TaskUpdateSerializer(serializers.ModelSerializer):
     def validate(self, data):
         if data.get('status') == 'COMPLETED':
             if not data.get('completion_report'):
-                raise serializers.ValidationError("Completion report is required when marking a task as completed.")
+                raise serializers.ValidationError("Completion report is required when marking task as completed")
             if not data.get('worked_hours'):
-                raise serializers.ValidationError("Worked hours must be provided when marking a task as completed.")
+                raise serializers.ValidationError(" Users Worked hours provided when marking task as completed")
         return data
     
