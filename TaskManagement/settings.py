@@ -25,7 +25,8 @@ SECRET_KEY = 'django-insecure-5@v#h3z8eo%!!1u_@-l6v+z*8wt_tb-ux-jkw2r-0rk_1n#ois
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["*"]
+CORS_ALLOW_ALL_ORIGINS = True  # For development only
 
 
 # Application definition
@@ -37,7 +38,32 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'TMApp',
+    'rest_framework',
+    'corsheaders',
+    'rest_framework_simplejwt',
 ]
+
+
+AUTH_USER_MODEL = 'TMApp.User'
+
+# REST Framework settings
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
+
+# JWT Settings
+from datetime import timedelta
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=1),
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -47,6 +73,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
 ]
 
 ROOT_URLCONF = 'TaskManagement.urls'
@@ -75,8 +102,12 @@ WSGI_APPLICATION = 'TaskManagement.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'django.db.backends.mysql',
+        'NAME': 'TM_db',
+        'USER': 'root',  # Corrected key
+        'PASSWORD': '',  # Ensure this is correct
+        'HOST': 'localhost',
+        'PORT': '3306',  # Default MySQL port
     }
 }
 
