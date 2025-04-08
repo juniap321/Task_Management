@@ -3,10 +3,9 @@ from rest_framework.response import Response
 from rest_framework import status, permissions
 from django.shortcuts import get_object_or_404
 from .models import User, Task
-from .serializers import UserSerializer, UserCreateSerializer, TaskSerializer, TaskUpdateSerializer
-from .permissions import IsSuperAdmin, IsAdminUser, IsTaskOwner
+from .serializers import *
+from .permissions import *
 
-# User views
 class UserListCreateView(APIView):
     def get_permissions(self):
         if self.request.method == 'POST':
@@ -49,7 +48,6 @@ class UserDetailView(APIView):
         user.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-# Task views
 class TaskListCreateView(APIView):
     def get_permissions(self):
         if self.request.method == 'POST':
