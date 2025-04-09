@@ -1,16 +1,55 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, permissions
+from rest_framework import status
+from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework_simplejwt.tokens import RefreshToken
+from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
-from .models import User, Task
-from .serializers import *
-from .permissions import *
+from django.contrib.auth import get_user_model
+from .models import Task
+from .serializers import (
+    UserSerializer, 
+    TaskSerializer, 
+    TaskUpdateSerializer, 
+    TaskReportSerializer, 
+    UserLoginSerializer
+)
+
+User = get_user_model()
+
+class IsSuperAdmin(IsAuthenticated):
+    def has_permission(self, request, view):
+        return super().has_permission(request, view) and request.user.is_superadmin()
+
+class IsAdmin(IsAuthenticated):
+    def has_permission(self, request, view):
+        return super().has_permission(request, view) and request.user.is_admin()
+
+class UserLoginView(APIView):
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        serializer = UserLoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        username = serializer.validated_data['username']
+        password = serializer.validated_data['password']
+        
+        user = authenticate(username=username, password=password)
+        
+        if user is not None:
+            refresh = RefreshToken.for_user(user)
+            return Response({
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
+                'user_id': user.id,
+                'username': user.username,
+                'role': user.role
+            })
+        return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
 
 class UserListCreateView(APIView):
-    def get_permissions(self):
-        if self.request.method == 'POST':
-            return [IsSuperAdmin()]
-        return [IsAdminUser()]
+    permission_classes = [IsSuperAdmin]
     
     def get(self, request):
         users = User.objects.all()
@@ -18,7 +57,7 @@ class UserListCreateView(APIView):
         return Response(serializer.data)
     
     def post(self, request):
-        serializer = UserCreateSerializer(data=request.data)
+        serializer = UserSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -37,7 +76,7 @@ class UserDetailView(APIView):
     
     def put(self, request, pk):
         user = self.get_object(pk)
-        serializer = UserSerializer(user, data=request.data)
+        serializer = UserSerializer(user, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
@@ -49,21 +88,24 @@ class UserDetailView(APIView):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 class TaskListCreateView(APIView):
-    def get_permissions(self):
-        if self.request.method == 'POST':
-            return [IsAdminUser()]
-        return [permissions.IsAuthenticated()]
+    permission_classes = [IsAuthenticated]
     
     def get(self, request):
-        user = request.user
-        if user.is_admin():
+        if request.user.is_superadmin():
             tasks = Task.objects.all()
+        elif request.user.is_admin():
+            tasks = Task.objects.filter(created_by=request.user)
         else:
-            tasks = Task.objects.filter(assigned_to=user)
+            tasks = Task.objects.filter(assigned_to=request.user)
+        
         serializer = TaskSerializer(tasks, many=True)
         return Response(serializer.data)
     
     def post(self, request):
+        if not request.user.is_admin():
+            return Response({"error": "You don't have permission to create tasks"},
+                           status=status.HTTP_403_FORBIDDEN)
+        
         serializer = TaskSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save(created_by=request.user)
@@ -71,65 +113,60 @@ class TaskListCreateView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 class TaskDetailView(APIView):
-    def get_permissions(self):
-        if self.request.method in ['PUT', 'DELETE']:
-            return [IsAdminUser()]
-        return [permissions.IsAuthenticated()]
+    permission_classes = [IsAuthenticated]
     
-    def get_object(self, pk, request):
+    def get_object(self, pk):
         task = get_object_or_404(Task, pk=pk)
-        if not request.user.is_admin() and task.assigned_to != request.user:
-            self.permission_denied(request)
+        
+        if not task.created_by == self.request.user and not task.assigned_to == self.request.user and not self.request.user.is_superadmin():
+            self.permission_denied(self.request)
+            
         return task
     
     def get(self, request, pk):
-        task = self.get_object(pk, request)
+        task = self.get_object(pk)
         serializer = TaskSerializer(task)
         return Response(serializer.data)
     
     def put(self, request, pk):
-        task = self.get_object(pk, request)
-        serializer = TaskSerializer(task, data=request.data)
+        task = self.get_object(pk)
+        
+        if request.user.is_normal_user():
+            if task.assigned_to != request.user:
+                return Response({"error": "You can only update tasks assigned to you"}, 
+                               status=status.HTTP_403_FORBIDDEN)
+            
+            serializer = TaskUpdateSerializer(task, data=request.data, partial=True)
+        else:
+            serializer = TaskSerializer(task, data=request.data, partial=True)
+        
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     def delete(self, request, pk):
-        task = self.get_object(pk, request)
+        if not request.user.is_admin():
+            return Response({"error": "You don't have permission to delete tasks"},
+                           status=status.HTTP_403_FORBIDDEN)
+            
+        task = self.get_object(pk)
         task.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-class UserTaskUpdateView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsTaskOwner]
-    
-    def put(self, request, pk):
-        task = get_object_or_404(Task, pk=pk, assigned_to=request.user)
-        serializer = TaskUpdateSerializer(task, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 class TaskReportView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [IsAdmin]  
     
     def get(self, request, pk):
         task = get_object_or_404(Task, pk=pk)
         
-        # Check if user can access this report
-        user = request.user
-        if not user.is_admin() and task.assigned_to != user:
-            return Response({"detail": "You do not have permission to view this report."}, 
+        if not request.user.is_superadmin() and task.created_by != request.user:
+            return Response({"error": "You don't have permission to view this report"},
                            status=status.HTTP_403_FORBIDDEN)
-        
-        if task.status != 'COMPLETED':
-            return Response({"detail": "Report is only available for completed tasks."}, 
+            
+        if task.status != 'completed':
+            return Response({"error": "Task is not completed yet"},
                            status=status.HTTP_400_BAD_REQUEST)
-        
-        return Response({
-            'title': task.title,
-            'completion_report': task.completion_report,
-            'worked_hours': task.worked_hours,
-            'completed_by': task.assigned_to.username
-        })
+            
+        serializer = TaskReportSerializer(task)
+        return Response(serializer.data)
