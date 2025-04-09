@@ -7,13 +7,7 @@ from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
 from .models import Task
-from .serializers import (
-    UserSerializer, 
-    TaskSerializer, 
-    TaskUpdateSerializer, 
-    TaskReportSerializer, 
-    UserLoginSerializer
-)
+from .serializers import *
 
 User = get_user_model()
 
