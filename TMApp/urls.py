@@ -1,23 +1,16 @@
 from django.urls import path
-from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
-from .views import (
-    UserListCreateView, UserDetailView,
-    TaskListCreateView, TaskDetailView,
-    UserTaskUpdateView, TaskReportView
-)
+from rest_framework_simplejwt.views import TokenRefreshView
+from .views import *
 
 urlpatterns = [
-    # Auth endpoints
-    path('auth/token/', TokenObtainPairView.as_view(), name='token_obtain'),
-    path('auth/token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
+    path('api/login/', UserLoginView.as_view(), name='login'),
     
-    # User endpoints
-    path('users/', UserListCreateView.as_view(), name='user-list-create'),
-    path('users/<int:pk>/', UserDetailView.as_view(), name='user-detail'),
+    # User (SuperAdmin only)
+    path('api/users/', UserListCreateView.as_view(), name='user-list'),
+    path('api/users/<int:pk>/', UserDetailView.as_view(), name='user-detail'),
     
-    # Task endpoints
-    path('tasks/', TaskListCreateView.as_view(), name='task-list-create'),
-    path('tasks/<int:pk>/', TaskDetailView.as_view(), name='task-detail'),
-    path('tasks/<int:pk>/update/', UserTaskUpdateView.as_view(), name='user-task-update'),
-    path('tasks/<int:pk>/report/', TaskReportView.as_view(), name='task-report'),
+    # Task management
+    path('api/tasks/', TaskListCreateView.as_view(), name='task-list'),
+    path('api/tasks/<int:pk>/', TaskDetailView.as_view(), name='task-detail'),
+    path('api/tasks/<int:pk>/report/', TaskReportView.as_view(), name='task-report'),
 ]
