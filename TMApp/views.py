@@ -40,7 +40,7 @@ class UserLoginView(APIView):
                 'username': user.username,
                 'role': user.role
             })
-        return Response({'error': 'Invalid credentials'}, status=status.HTTP_401_UNAUTHORIZED)
+        return Response({'error': 'Invalid credentials'})
 
 class UserListCreateView(APIView):
     permission_classes = [IsSuperAdmin]
@@ -54,8 +54,8 @@ class UserListCreateView(APIView):
         serializer = UserSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data, status=status.HTTP_201_CREATED)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            return Response(serializer.data)
+        return Response(serializer.errors)
 
 class UserDetailView(APIView):
     permission_classes = [IsSuperAdmin]
@@ -74,12 +74,12 @@ class UserDetailView(APIView):
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(serializer.errors)
     
     def delete(self, request, pk):
         user = self.get_object(pk)
         user.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({"error": "error"})
 
 class TaskListCreateView(APIView):
     permission_classes = [IsAuthenticated]
@@ -97,8 +97,7 @@ class TaskListCreateView(APIView):
     
     def post(self, request):
         if not request.user.is_admin():
-            return Response({"error": "You don't have permission to create tasks"},
-                           status=status.HTTP_403_FORBIDDEN)
+            return Response({"error": "You don't have permission to create tasks"})
         
         serializer = TaskSerializer(data=request.data)
         if serializer.is_valid():
@@ -127,8 +126,7 @@ class TaskDetailView(APIView):
         
         if request.user.is_normal_user():
             if task.assigned_to != request.user:
-                return Response({"error": "You can only update tasks assigned to you"}, 
-                               status=status.HTTP_403_FORBIDDEN)
+                return Response({"error": "You can only update tasks assigned to you"})
             
             serializer = TaskUpdateSerializer(task, data=request.data, partial=True)
         else:
@@ -141,12 +139,11 @@ class TaskDetailView(APIView):
     
     def delete(self, request, pk):
         if not request.user.is_admin():
-            return Response({"error": "You don't have permission to delete tasks"},
-                           status=status.HTTP_403_FORBIDDEN)
+            return Response({"error": "You don't have permission to delete tasks"})
             
         task = self.get_object(pk)
         task.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({"error": "error"})
 
 class TaskReportView(APIView):
     permission_classes = [IsAdmin]  
@@ -155,12 +152,10 @@ class TaskReportView(APIView):
         task = get_object_or_404(Task, pk=pk)
         
         if not request.user.is_superadmin() and task.created_by != request.user:
-            return Response({"error": "You don't have permission to view this report"},
-                           status=status.HTTP_403_FORBIDDEN)
+            return Response({"error": "You don't have permission to view this report"})
             
         if task.status != 'completed':
-            return Response({"error": "Task is not completed yet"},
-                           status=status.HTTP_400_BAD_REQUEST)
+            return Response({"error": "Task is not completed yet"})
             
         serializer = TaskReportSerializer(task)
         return Response(serializer.data)
