@@ -1,0 +1,26 @@
+name: Build 
+
+on:
+  workflow_dispatch:
+    inputs:
+      app-version:
+        description: "version"
+        default: "v1.0.0"  
+
+jobs:
+  summit-website-console:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Get the Git tag name
+        id: tag_name
+        run: echo "::set-output name=TAG_NAME::$(echo $GITHUB_REF | cut -d '/' -f 3)"
+
+      - name: SUMMIT WEBSITE CONSOLE
+        run: |
+          docker login ghcr.io -u anwar-tecnots -p ${{ secrets.GIT_PAT }}
+          docker build --no-cache -t ghcr.io/tecnots/summit-website-console/app:${{ github.event.inputs.app-version }} -f ./Dockerfile .
+          docker push ghcr.io/tecnots/summit-website-console/app:${{ github.event.inputs.app-version }}
